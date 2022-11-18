@@ -42,7 +42,6 @@ def main():
                                      outputs=[output_od_scores])
         
         pred_dict = query_response.as_numpy("detection_scores")
-        print('IOOOO')
         print(pred_dict)
         break
         
