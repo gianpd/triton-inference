@@ -1,2 +1,7 @@
 *.pb
 variables/
+__pycache__/
+1/
+*.jpg
+*.jpeg
+*.png

@@ -16,45 +16,36 @@ input: [
 ],
 output: [
     {
-        name: "num_detections",
-        data_type: TYPE_INT32,
-        dims: [
-            1
-        ],
-    },
-    {
-        name: "detection_boxes",
+        name: "od_boxes",
         data_type: TYPE_FP32,
         dims: [
-            100,
-            4
+            1, 100, 4
         ],
     },
     {
-        name: "detection_scores",
+        name: "od_scores",
         data_type: TYPE_FP32,
         dims: [
-            100
-        ],
-    },
-    {
-        name: "detection_classes",
-        data_type: TYPE_INT32,
-        dims: [
-            100
+            1, 100
         ],
     }
 ],
 
+# Specify CPU instance.
+instance_group {
+  name: "pipeline_0",
+  count: 1
+  kind: KIND_CPU
+}
 
-instance_group: [
-    {
-        name: "pipeline_0",
-        kind: KIND_GPU,
-        count: 1,
-        gpus: [
-            0
-        ],
-    }
-],
+# instance_group: [
+#     {
+#         name: "pipeline_0",
+#         kind: KIND_GPU,
+#         count: 1,
+#         gpus: [
+#             0
+#         ],
+#     }
+# ],
 default_model_filename: "model.py"

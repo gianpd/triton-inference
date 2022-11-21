@@ -23,46 +23,33 @@ def main():
         img = rs_client.get_np_img(payload['data'])
         msg.good(f'Initial img shape: {img.shape}')
         # preprocess input img
-        msg.good(img.dtype)
-        img = cv2.resize(img, (640, 640), interpolation=cv2.INTER_LANCZOS4)
-        msg.good(f'After resize {img.shape}')
-        img = img / 255.0
-        img = np.asarray(np.expand_dims(img, axis=0), dtype=np.float32)
+        # img = cv2.resize(img, (640, 640), interpolation=cv2.INTER_LANCZOS4)
+        # msg.good(f'After resize {img.shape}')
+        # img = img / 255.0
+        # img = np.asarray(np.expand_dims(img, axis=0), dtype=np.float32)
+        img = np.expand_dims(img, axis=0)
+        
         msg.good(f'After normalization {img.dtype, img.shape}')
-        input_raw_img = httpclient.InferInput("input", img.shape, np_to_triton_dtype(img.dtype))
+        input_raw_img = httpclient.InferInput("input_tensor", img.shape, np_to_triton_dtype(img.dtype))
         input_raw_img.set_data_from_numpy(img)
-        print(f'INPUT_RAW_IMG: {input_raw_img}')
+        # msg.good(f'INPUT_RAW_IMG: {input_raw_img}')
         
-        output_od_scores = httpclient.InferRequestedOutput("detection_scores")
-        
-
-        
+        od_outputs  = [
+            httpclient.InferRequestedOutput("od_scores"),
+            httpclient.InferRequestedOutput("od_boxes"),
+            # httpclient.InferRequestedOutput("detection_classes"),
+        ]
         query_response = client.infer(model_name='pipeline',
                                      inputs=[input_raw_img],
-                                     outputs=[output_od_scores])
+                                     outputs=od_outputs)
         
-        pred_dict = query_response.as_numpy("detection_scores")
-        print(pred_dict)
+        scores_dict = query_response.as_numpy("od_scores")
+        boxes_dict = query_response.as_numpy("od_boxes")
+        # classes_dict = query_response.as_numpy("detection_classes")
+        msg.good(f'Scores dict:\n {scores_dict}')
+        msg.good(f'Boxes dict:\n {boxes_dict}')
+        # msg.good(f'Classes dict:\n {classes_dict}')
         break
-        
-        
-
-    # prompt = "Pikachu with a hat, 4k, 3d render"
-    # text_obj = np.array([prompt], dtype="object").reshape((-1, 1))
-
-    # input_text = httpclient.InferInput("prompt", text_obj.shape,
-    #                                    np_to_triton_dtype(text_obj.dtype))
-    # input_text.set_data_from_numpy(text_obj)
-
-    # output_img = httpclient.InferRequestedOutput("generated_image")
-
-    # query_response = client.infer(model_name="pipeline",
-    #                               inputs=[input_text],
-    #                               outputs=[output_img])
-
-    # image = query_response.as_numpy("generated_image")
-    # im = Image.fromarray(np.squeeze(image.astype(np.uint8)))
-    # im.save("generated_image2.jpg")
 
 if __name__ == "__main__":
     start = time.time()
