@@ -3,7 +3,6 @@ import time
 from tritonclient.utils import *
 from PIL import Image
 import tritonclient.http as httpclient
-import cv2
 import redis_utils as rutils
 from wasabi import msg
 
@@ -34,20 +33,25 @@ def main():
         input_raw_img.set_data_from_numpy(img)
         # msg.good(f'INPUT_RAW_IMG: {input_raw_img}')
         
-        od_outputs  = [
-            httpclient.InferRequestedOutput("od_scores"),
-            httpclient.InferRequestedOutput("od_boxes"),
+        # od_outputs  = [
+        #     httpclient.InferRequestedOutput("od_scores"),
+        #     httpclient.InferRequestedOutput("od_boxes"),
+        #     # httpclient.InferRequestedOutput("detection_classes"),
+        # ]
+        dc_outputs  = [
+            httpclient.InferRequestedOutput("dc_scores"),
             # httpclient.InferRequestedOutput("detection_classes"),
         ]
+        
         query_response = client.infer(model_name='pipeline',
                                      inputs=[input_raw_img],
-                                     outputs=od_outputs)
+                                     outputs=dc_outputs)
         
-        scores_dict = query_response.as_numpy("od_scores")
-        boxes_dict = query_response.as_numpy("od_boxes")
+        scores_dict = query_response.as_numpy("dc_scores")
+        #boxes_dict = query_response.as_numpy("od_boxes")
         # classes_dict = query_response.as_numpy("detection_classes")
         msg.good(f'Scores dict:\n {scores_dict}')
-        msg.good(f'Boxes dict:\n {boxes_dict}')
+        #msg.good(f'Boxes dict:\n {boxes_dict}')
         # msg.good(f'Classes dict:\n {classes_dict}')
         break
 
