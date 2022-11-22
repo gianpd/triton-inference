@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  triton-client:
+    container_name: "triton-client-container"
+    build:
+     context: ./TritonClient
+     dockerfile: Dockerfile
+    ports:
+     - "8000:8000"
+    volumes:
+     - "./TritonClient/:/workspace/"
+    depends_on:
+     - triton-server
+     - grabber
+
+  grabber:
+    container_name: "fake-grabber-container"
+    command: "test"
+    build:
+      context: ./KeyDB
+    depends_on:
+     - key-db-server
+
+  key-db-server:
+    container_name: "NJKeyDB-server"
+    image: "eqalpha/keydb"
+    command: "keydb-server"
+    ports: 
+    - "6379:6379"
+
+  triton-server:
+    container_name: "triton-server-container"
+    # image: "nvcr.io/nvidia/tritonserver:22.10-py3"
+    ipc: host
+    command: "tritonserver --model-repository=/workspace/model_repository/ --log-verbose=1 --exit-on-error=false"
+    build:
+     context: ./TritonServer
+     dockerfile: Dockerfile
+     shm_size: 256m
+    ports:
+     - "8001:8001"
+     - "8002:8002"
+     - "8003:8000"
+    volumes:
+    - "./TritonServer:/workspace/"
+

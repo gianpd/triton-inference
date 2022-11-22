@@ -3,7 +3,7 @@ import time
 from tritonclient.utils import *
 from PIL import Image
 import tritonclient.http as httpclient
-import cv2
+# import cv2
 import redis_utils as rutils
 from wasabi import msg
 
@@ -11,9 +11,9 @@ from wasabi import msg
 def main():
 
     # 0. Set up the connection with the server
-    client = httpclient.InferenceServerClient(url="localhost:8000")
+    client = httpclient.InferenceServerClient(url='triton-server:8000')
     # 1. Start the communication channel with the redis server, for receiving the requests to be passed to the models
-    rs_client = rutils.NJRedisClient(host='172.17.0.2', port=6379, db=0, key='NJ')
+    rs_client = rutils.NJRedisClient(host='key-db-server', port=6379, db=0, key='NJ')
     # 1a. Start the receiving loop: how the loop ends ? (S1:it could be ended when a particular msgpack is received (?))
     while True:
         payload = rs_client.get_msg

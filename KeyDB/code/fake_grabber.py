@@ -39,7 +39,7 @@ import msgpack
 import argparse 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--host', type=str, required=True)
+parser.add_argument('--host', type=str, default='key-db-server')
 parser.add_argument('--port', type=int, default=6379)
 parser.add_argument('--test', action='store_true')
 args = parser.parse_args()
