@@ -1,33 +1,48 @@
 version: "3.9"
 
 services:
+  
+  tmp:
+    image: busybox
+    command: chmod -R 777 /tmp/docker
+    volumes:
+      - /tmp/docker/
+
   triton-client:
-    container_name: "triton-client-container"
+    container_name: "nj-triton-client-container"
     build:
      context: ./TritonClient
      dockerfile: Dockerfile
     ports:
-     - "8000:8000"
+     - "4000:4000"
     volumes:
      - "./TritonClient/:/workspace/"
+    volumes_from:
+     - tmp
     depends_on:
-     - triton-server
      - grabber
+     - key-db-server
 
   grabber:
     container_name: "fake-grabber-container"
     command: "test"
     build:
       context: ./KeyDB
+    volumes_from:
+     - tmp
     depends_on:
      - key-db-server
 
   key-db-server:
     container_name: "NJKeyDB-server"
     image: "eqalpha/keydb"
-    command: "keydb-server"
+    command: "keydb-server /etc/keydb.conf"
     ports: 
     - "6379:6379"
+    volumes:
+     - "./keydb-conf/keydb.conf:/etc/keydb.conf"
+    volumes_from:
+     - tmp
 
   triton-server:
     container_name: "triton-server-container"
@@ -39,9 +54,9 @@ services:
      dockerfile: Dockerfile
      shm_size: 256m
     ports:
-     - "8001:8001"
-     - "8002:8002"
-     - "8003:8000"
+     - "4001:4001"
+     - "4002:4002"
+     - "4003:4000"
     volumes:
     - "./TritonServer:/workspace/"
 

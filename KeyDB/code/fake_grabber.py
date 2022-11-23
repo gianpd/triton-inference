@@ -51,7 +51,7 @@ KEY = 'NJ'
 IMG_BYTES = Path("image_2022-10-12_13-38-31.496364.jpg").read_bytes()
 
 
-grabber_redis = redis.Redis(host=args.host, port=args.port, db=0)
+grabber_redis = redis.Redis(unix_socket_path='/tmp/docker/keydb.sock')
 ascii_letters = string.ascii_letters
 N = len(ascii_letters)
 start = datetime.now()

@@ -1,25 +1,23 @@
-from datetime import datetime
 import redis
-import time
 import msgpack
 import cv2
 import numpy as np
 
-from typing import List, Dict, Union, Optional
+from typing import Optional
 
 FPS = 5
 RATE = 1 / FPS
 KEY = 'NJ'
 
 class NJRedisClient:
-    def __init__(self, host: str, port: int, key: str, db: Optional[int] = 0, fps: Optional[int] = 8):
+    def __init__(self, host: Optional[str] = 'localhost', port: Optional[int] = 6379, key: Optional[str] = KEY, unix_socket_path: Optional[str] = None, db: Optional[int] = 0, fps: Optional[int] = 8):
         self._host = host
         self._port = port
         self._key = key
         self._db = db
         self._fps = fps
         self._msgpack = None
-        self._nj_redis = redis.Redis(host, port, db)
+        self._nj_redis = redis.Redis(host=host, port=port, db=db, unix_socket_path=unix_socket_path)
     
     @property
     def get_msg(self):
