@@ -10,11 +10,14 @@ from typing import List, Union, Optional
 import numpy as np
 import cv2
 import tensorflow as tf
+from PIL import Image
+import io
 
 import triton_python_backend_utils as pb_utils
 
 OD_SCORE_TH = 0.8
 INTERNAL_PERCENTAGE_IMAGE_TOTAKE = 0.6
+DC_SCORE_TH = 0.3
 
 LOG_IDX= 'NJTritonServer>'
 class TritonPythonModel:
@@ -42,7 +45,6 @@ class TritonPythonModel:
         """
         responses = []
         for request in requests:
-            msg.info('REQUEST TYPE : ', type(request))
             input_img = pb_utils.get_input_tensor_by_name(request, "input_tensor")
             size = input_img.shape()
             msg.info(f'{LOG_IDX} Receiced input with shape: {size}')
@@ -57,32 +59,32 @@ class TritonPythonModel:
             # check if there dywidags
             boxes_to_consider = self.check_if_dywidags(size[1], size[2], od_scores[0], od_boxes[0])
             if len(boxes_to_consider):
-                # make DC request
-                msg.info(type(input_img))
-                dc_scores = self.crop_inference(input_img,boxes_to_consider,resizing=(260,260))
-                #od_scores = pb_utils.Tensor('od_scores', od_scores)
-                #od_boxes = pb_utils.Tensor('od_boxes', od_boxes)
-                inference_response = pb_utils.InferenceResponse(output_tensors=dc_scores)
-                responses.append(inference_response)
+                for bbox_to_consider in boxes_to_consider :
+                    image_cropped = self.crop_single_image(input_img,bbox_to_consider,(260,260))
+                    inference_dc = self.inference_single_image_dc(image_cropped)
+                    inference_dc = self.check_if_defects(inference_dc)
+                    if inference_dc != None :
+                        dc_score = pb_utils.Tensor('dc_scores', inference_dc.as_numpy())
+                        inference_response = pb_utils.InferenceResponse(output_tensors=[dc_score])
+                        responses.append(inference_response)
         return responses
     
-    def crop_inference(self,input_img, boxes_to_consider, resizing) :
+    
+    def inference_single_image_dc(self, image_cropped) :
         
-        list_predictions = []
+            out_tensor_0 = pb_utils.Tensor("input_1",image_cropped)
+            dc_scores = self.make_dc_request(out_tensor_0)
+            
+            return dc_scores 
         
-        for bbox_num, bbox_to_consider in enumerate(boxes_to_consider):
+    def crop_single_image(self,input_img,bbox_to_consider,resizing) :
             cropped_image = input_img.as_numpy()[0][int(bbox_to_consider[1]):int(bbox_to_consider[1])+int(bbox_to_consider[3]), int(bbox_to_consider[0]):int(bbox_to_consider[0])+int(bbox_to_consider[2])]
             cropped_image_resized= cv2.resize(cropped_image, dsize=resizing, interpolation=cv2.INTER_LANCZOS4)
-            #cropped_image_resized = tf.expand_dims(tf.convert_to_tensor(cv2.cvtColor(cropped_image_resized, cv2.COLOR_RGB2BGR)), axis=0)
-            msg.info(type(input_img.as_numpy()))
+            cropped_image_resized = tf.expand_dims(tf.convert_to_tensor(cv2.cvtColor(cropped_image_resized, cv2.COLOR_RGB2BGR)), axis=0)
+            img_final = cropped_image_resized.numpy()
+            img_final = np.float32(img_final)
             
-            #cropped_image_resized = c_python_backend_utils.Tensor(arg0= 'test',arg1=input_img.as_numpy())
-            
-            dc_scores = self.make_dc_request(cropped_image_resized)
-            msg.good(f'dc_scores: {dc_scores}')
-            list_predictions.append(dc_scores)
-        
-        return list_predictions
+            return img_final
 
          
     def make_od_request(self, input_img):
@@ -134,12 +136,15 @@ class TritonPythonModel:
              raise pb_utils.TritonModelException(response.error().message())
         else:
              dc_scores = pb_utils.get_output_tensor_by_name(
-                     response, "output_1")
+                     response, "output")
         return dc_scores     
     
     
-    def check_if_defects(self):
-        pass
+    def check_if_defects(self, dc_score):
+        for score in dc_score.as_numpy()[0] :
+            if score > DC_SCORE_TH : 
+                return dc_score
+        return None
 
     def bbox_to_coco(self, bbox, w_img, h_img):
         """

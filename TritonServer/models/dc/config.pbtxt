@@ -25,7 +25,7 @@ output: [
 
 # Specify CPU instance.
 instance_group {
-  name: "dc_0",
+  name: "od_0",
   count: 1
   kind: KIND_CPU
 }

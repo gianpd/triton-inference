@@ -47,7 +47,9 @@ def main():
                                      inputs=[input_raw_img],
                                      outputs=dc_outputs)
         
-        scores_dict = query_response.as_numpy("dc_scores")
+        msg.good(f'Response dict:\n {query_response}')
+        scores_dict = query_response.as_numpy('dc_scores')
+        #cores_dict = query_response.as_numpy('output')
         #boxes_dict = query_response.as_numpy("od_boxes")
         # classes_dict = query_response.as_numpy("detection_classes")
         msg.good(f'Scores dict:\n {scores_dict}')
