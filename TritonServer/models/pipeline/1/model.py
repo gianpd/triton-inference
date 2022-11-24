@@ -19,6 +19,49 @@ INTERNAL_PERCENTAGE_IMAGE_TOTAKE = 0.6
 DC_SCORE_TH = 0.3
 RESIZE_OUTPUT_IMAGES_SHAPE = 260
 
+
+class TF_preprocessing_model_justtf():
+
+    def __init__(
+        self, 
+        OD_SCORE_TH: float, 
+        INTERNAL_PERCENTAGE_IMAGE_TOTAKE: float, 
+        RESIZE_OUTPUT_IMAGES_SHAPE: int) -> None:
+        
+        #tf.keras.model.__super__()
+        self.od_thr= tf.convert_to_tensor(OD_SCORE_TH)
+        self.bbox_position_to_take= tf.convert_to_tensor(INTERNAL_PERCENTAGE_IMAGE_TOTAKE)
+        self.resize_shape= tf.convert_to_tensor([RESIZE_OUTPUT_IMAGES_SHAPE,RESIZE_OUTPUT_IMAGES_SHAPE])
+        
+    
+    @tf.function
+    def filter_and_crop_bboxes(
+        self, 
+        od_scores: tf.Tensor, 
+        od_bboxes: tf.Tensor,
+        image: tf.Tensor):
+        
+        """
+        Select bboxes to further analyze basing on the relative score - converting bbox to coco
+        """
+        od_scores = od_scores[0]
+        od_bboxes = od_bboxes[0]
+        
+        cropped_bboxes = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
+        if od_scores[0] >= self.od_thr:
+            for ind in tf.range(10):
+                if od_scores[ind] >= self.od_thr:
+                    if od_bboxes[ind][1] >= (0.5 - self.bbox_position_to_take/2) and od_bboxes[ind][3] <= (0.5 + self.bbox_position_to_take/2):
+                        cropped_bboxes = cropped_bboxes.write(ind, tf.image.crop_and_resize(image= image, boxes=tf.convert_to_tensor([od_bboxes[ind]]), box_indices= tf.convert_to_tensor([0]), crop_size= self.resize_shape, method='bilinear'))
+        
+        #return output = self.Model()
+        return cropped_bboxes.stack()
+
+
+preprocess = TF_preprocessing_model_justtf(OD_SCORE_TH=OD_SCORE_TH,
+                                                      INTERNAL_PERCENTAGE_IMAGE_TOTAKE=INTERNAL_PERCENTAGE_IMAGE_TOTAKE,
+                                                      RESIZE_OUTPUT_IMAGES_SHAPE=RESIZE_OUTPUT_IMAGES_SHAPE)
+
 LOG_IDX= 'NJTritonServer>'
 class TritonPythonModel:
     
@@ -53,21 +96,11 @@ class TritonPythonModel:
             od_scores, od_boxes = self.make_od_request(input_img)
             od_scores, od_boxes = tf.convert_to_tensor(od_scores.as_numpy(),dtype=tf.float32), tf.convert_to_tensor(od_boxes.as_numpy(),dtype=tf.float32)
             
-            A = TF_preprocessing_model_justtf(OD_SCORE_TH=OD_SCORE_TH,
-                                                      INTERNAL_PERCENTAGE_IMAGE_TOTAKE=INTERNAL_PERCENTAGE_IMAGE_TOTAKE,
-                                                      RESIZE_OUTPUT_IMAGES_SHAPE=RESIZE_OUTPUT_IMAGES_SHAPE)
-            
-            boxes_to_consider= A.filter_and_crop_bboxes(od_scores=od_scores,od_bboxes=od_boxes,image=tf.convert_to_tensor(input_img.as_numpy(),dtype=tf.uint8))
-            
-            images_dc = [subresult for result in boxes_to_consider for subresult in result if len(result)]
-
-            #msg.info(f'od_scores: {od_scores[:5]}')
-            #msg.info(f'od_boxes: {od_boxes[:5]}')
+            boxes_to_consider= preprocess.filter_and_crop_bboxes(od_scores=od_scores,od_bboxes=od_boxes,image=tf.convert_to_tensor(input_img.as_numpy(),dtype=tf.uint8))
 
             # check if there dywidags
-            if len(images_dc):
-                for image_cropped in images_dc :
-                    #image_cropped = self.crop_single_image(input_img,bbox_to_consider,(260,260))
+            if len(boxes_to_consider[0]):
+                for image_cropped in boxes_to_consider[0] :
                     inference_dc = self.inference_single_image_dc(tf.expand_dims(image_cropped,axis=0).numpy())
                     inference_dc = self.check_if_defects(inference_dc)
                     if inference_dc != None :
@@ -83,15 +116,6 @@ class TritonPythonModel:
             dc_scores = self.make_dc_request(out_tensor_0)
             
             return dc_scores 
-        
-    # def crop_single_image(self,input_img,bbox_to_consider,resizing) :
-    #         cropped_image = input_img.as_numpy()[0][int(bbox_to_consider[1]):int(bbox_to_consider[1])+int(bbox_to_consider[3]), int(bbox_to_consider[0]):int(bbox_to_consider[0])+int(bbox_to_consider[2])]
-    #         cropped_image_resized= cv2.resize(cropped_image, dsize=resizing, interpolation=cv2.INTER_LANCZOS4)
-    #         cropped_image_resized = tf.expand_dims(tf.convert_to_tensor(cv2.cvtColor(cropped_image_resized, cv2.COLOR_RGB2BGR)), axis=0)
-    #         img_final = cropped_image_resized.numpy()
-    #         img_final = np.float32(img_final)
-            
-    #         return img_final
 
          
     def make_od_request(self, input_img):
@@ -148,41 +172,3 @@ class TritonPythonModel:
         y = bbox[0]*h_img
         return [x, y, w, h]
     
-class TF_preprocessing_model_justtf():
-    
-    
-
-    def __init__(
-        self, 
-        OD_SCORE_TH: float, 
-        INTERNAL_PERCENTAGE_IMAGE_TOTAKE: float, 
-        RESIZE_OUTPUT_IMAGES_SHAPE: int) -> None:
-        
-        #tf.keras.model.__super__()
-        self.od_thr= tf.convert_to_tensor(OD_SCORE_TH)
-        self.bbox_position_to_take= tf.convert_to_tensor(INTERNAL_PERCENTAGE_IMAGE_TOTAKE)
-        self.resize_shape= tf.convert_to_tensor([RESIZE_OUTPUT_IMAGES_SHAPE,RESIZE_OUTPUT_IMAGES_SHAPE])
-        
-    
-    @tf.function
-    def filter_and_crop_bboxes(
-        self, 
-        od_scores: tf.Tensor, 
-        od_bboxes: tf.Tensor,
-        image: tf.Tensor):
-        
-        """
-        Select bboxes to further analyze basing on the relative score - converting bbox to coco
-        """
-        od_scores = od_scores[0]
-        od_bboxes = od_bboxes[0]
-        
-        cropped_bboxes = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
-        if od_scores[0] >= self.od_thr:
-            for ind in tf.range(10):
-                if od_scores[ind] >= self.od_thr:
-                    if od_bboxes[ind][1] >= (0.5 - self.bbox_position_to_take/2) and od_bboxes[ind][3] <= (0.5 + self.bbox_position_to_take/2):
-                        cropped_bboxes = cropped_bboxes.write(ind, tf.image.crop_and_resize(image= image, boxes=tf.convert_to_tensor([od_bboxes[ind]]), box_indices= tf.convert_to_tensor([0]), crop_size= self.resize_shape, method='bilinear'))
-        
-        #return output = self.Model()
-        return cropped_bboxes.stack()
