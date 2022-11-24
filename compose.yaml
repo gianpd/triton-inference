@@ -10,11 +10,10 @@ services:
 
   triton-client:
     container_name: "nj-triton-client-container"
+    network_mode: host
     build:
      context: ./TritonClient
      dockerfile: Dockerfile
-    ports:
-     - "4000:4000"
     volumes:
      - "./TritonClient/:/workspace/"
     volumes_from:
@@ -22,6 +21,7 @@ services:
     depends_on:
      - grabber
      - key-db-server
+     # - triton-server
 
   grabber:
     container_name: "fake-grabber-container"
@@ -44,19 +44,25 @@ services:
     volumes_from:
      - tmp
 
-  triton-server:
-    container_name: "triton-server-container"
-    # image: "nvcr.io/nvidia/tritonserver:22.10-py3"
-    ipc: host
-    command: "tritonserver --model-repository=/workspace/model_repository/ --log-verbose=1 --exit-on-error=false"
-    build:
-     context: ./TritonServer
-     dockerfile: Dockerfile
-     shm_size: 256m
-    ports:
-     - "4001:4001"
-     - "4002:4002"
-     - "4003:4000"
-    volumes:
-    - "./TritonServer:/workspace/"
+#   triton-server:
+#     container_name: "triton-server-container"
+#     # image: "nvcr.io/nvidia/tritonserver:22.10-py3"
+#     ipc: host
+#     command: "tritonserver --model-repository=/workspace/model_repository/ --log-verbose=1 --exit-on-error=false"
+#     build:
+#      context: ./TritonServer
+#      dockerfile: Dockerfile
+#      shm_size: 256m
+#     ports:
+#      - "8001:8001"
+#      - "8002:8002"
+#      - "8003:8000"
+#     volumes:
+#     - "./TritonServer:/workspace/"
+#     deploy:
+#       resources:
+#         reservations:
+#           devices:
+#             - driver: nvidia
+#               capabilities: [gpu]
 

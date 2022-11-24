@@ -21,11 +21,11 @@ class TritonPythonModel:
         self.model_config = json.loads(args["model_config"])
         msg.good(f'model_config: {self.model_config}')
         
-        self.detection_scores_config = pb_utils.get_output_config_by_name(self.model_config, 'detection_scores')
-        msg.good(f'detection_scores config: {self.detection_scores_config}')
+        self.od_scores_config = pb_utils.get_output_config_by_name(self.model_config, 'od_scores')
+        msg.good(f'od_scores config: {self.od_scores_config}')
 
-        self.detection_boxes_config = pb_utils.get_output_config_by_name(self.model_config, 'detection_boxes')
-        msg.good(f'detection_boxes config: {self.detection_boxes_config}') 
+        self.od_boxes_config = pb_utils.get_output_config_by_name(self.model_config, 'od_boxes')
+        msg.good(f'od_boxes config: {self.od_boxes_config}') 
 
         # self.detection_classes_config = pb_utils.get_output_config_by_name(self.model_config, 'detection_classes')
         # msg.good(f'detection_classes config: {self.detection_classes_config}')   
@@ -39,27 +39,24 @@ class TritonPythonModel:
         4. BLS: if defects send message with image and defects (alarm message), if no defects send message without alarm.
         """
         responses = []
-        for request in requests:
-            input_img = pb_utils.get_input_tensor_by_name(request, "input_tensor")
+        for i, request in enumerate(requests):
+            msg.info(f'{LOG_IDX} Serving the {i}-th request ...')
+            input_img = pb_utils.get_input_tensor_by_name(request, "input")
             size = input_img.shape()
             msg.info(f'{LOG_IDX} Receiced input with shape: {size}')
         
-            # make an inference request to the OD model with the input_img as received by the pipeline model
+            ### make an inference request to the OD model with the input_img as received by the pipeline model
             od_scores, od_boxes = self.make_od_request(input_img)
-            od_scores, od_boxes = od_scores.as_numpy(), od_boxes.as_numpy()
+            # print(dir(od_scores))
+            ### prepare tensors output as required by the pipeline model
+            ### dlpack is needed: tensors are located into the GPU memory
+            # od_scores, od_boxes = np.from_dlpack(od_scores.to_dlpack()), np.from_dlpack(od_boxes.to_dlpack())
+            # os_scores = pb_utils.Tensor('od_scores', od_scores)
+            # os_boxes = pb_utils.Tensor('od_boxes', od_boxes)
 
-            msg.info(f'od_scores: {od_scores}')
-            msg.info(f'od_boxes: {od_boxes}')
-
-            # check if there dywidags
-            boxes_to_consider = self.check_if_dywidags(size[1], size[2], od_scores[0], od_boxes[0])
-            if len(boxes_to_consider):
-                # make DC request
-                # self.make_dc_request(cropped_img)
-                od_scores = pb_utils.Tensor('od_scores', od_scores)
-                od_boxes = pb_utils.Tensor('od_boxes', od_boxes)
-                inference_response = pb_utils.InferenceResponse(output_tensors=[od_scores, od_boxes])
-                responses.append(inference_response)
+            inference_response = pb_utils.InferenceResponse(output_tensors=[od_scores, od_boxes])
+            responses.append(inference_response)
+            
         return responses
           
          
@@ -72,6 +69,7 @@ class TritonPythonModel:
         )
             
         response = od_encoding_request.exec()
+        msg.info(f'pipeline> Received response {response} from OD model')
         if response.has_error():
             msg.info('Error in pipeline')
             raise pb_utils.TritonModelException(response.error().message())
@@ -101,23 +99,6 @@ class TritonPythonModel:
 
     def make_dc_request(self):
         pass
-        # # make an inference request to the OD model with the input_img as received by the pipeline model
-        # od_encoding_request = pb_utils.InferenceRequest(
-        #     model_name='dc',
-        #     requested_output_names=['detection_scores', 'detection_boxes'],
-        #     inputs=[input_img]
-        # )
-            
-        # response = od_encoding_request.exec()
-        # if response.has_error():
-        #     raise pb_utils.TritonModelException(response.error().message())
-        # else:
-        #     od_scores = pb_utils.get_output_tensor_by_name(
-        #             response, "detection_scores")
-        #     od_boxes = pb_utils.get_output_tensor_by_name(
-        #             response, "detection_boxes"
-        #         )
-        # return od_scores, od_boxes
 
     def check_if_defects(self):
         pass

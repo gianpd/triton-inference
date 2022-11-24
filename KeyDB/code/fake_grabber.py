@@ -60,7 +60,7 @@ for i in range(STEPS):
     time.sleep(RATE)
     idx = random.randint(0, N-1)
     _d = ascii_letters[idx:]
-    payload = {'data': IMG_BYTES, 'timestamp': 12345, 'd3': _d, 'EXIT': None}
+    payload = {'data': IMG_BYTES, 'size': {'width': 2048, 'height': 1500},  'timestamp': 12345, 'd3': _d, 'EXIT': None}
     payload = msgpack.packb(payload, use_bin_type=True)
     grabber_redis.set(KEY, payload)
 print(f'GRABBER DONE - elapsed: {(datetime.now() - start).total_seconds()} [s]') # 101 [s]
