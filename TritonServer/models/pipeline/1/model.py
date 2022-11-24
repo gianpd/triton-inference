@@ -16,7 +16,7 @@ import triton_python_backend_utils as pb_utils
 
 OD_SCORE_TH = 0.8
 INTERNAL_PERCENTAGE_IMAGE_TOTAKE = 0.6
-DC_SCORE_TH = 0.3
+DC_SCORE_TH = 0.9
 RESIZE_OUTPUT_IMAGES_SHAPE = 260
 
 
@@ -103,10 +103,12 @@ class TritonPythonModel:
                 for image_cropped in boxes_to_consider[0] :
                     inference_dc = self.inference_single_image_dc(tf.expand_dims(image_cropped,axis=0).numpy())
                     inference_dc = self.check_if_defects(inference_dc)
-                    if inference_dc != None :
-                        dc_score = pb_utils.Tensor('dc_scores', inference_dc.as_numpy())
-                        inference_response = pb_utils.InferenceResponse(output_tensors=[dc_score])
-                        responses.append(inference_response)
+                    try :
+                        dc_score = pb_utils.Tensor('dc_scores', inference_dc)
+                    except :
+                        dc_score = pb_utils.Tensor('dc_scores',np.zeros((1,3)))
+                    inference_response = pb_utils.InferenceResponse(output_tensors=[dc_score])
+                    responses.append(inference_response)
         return responses
     
     
@@ -157,10 +159,14 @@ class TritonPythonModel:
     
     
     def check_if_defects(self, dc_score):
-        for score in dc_score.as_numpy()[0] :
-            if score > DC_SCORE_TH : 
-                return dc_score
-        return None
+        if dc_score == None :
+            msg.info(f'SONO QUA {np.zeros(dc_score.shape)}')
+            return np.zeros(dc_score.shape)
+        else :
+            for score in dc_score.as_numpy()[0] :
+                if score > DC_SCORE_TH : 
+                    return dc_score.as_numpy()
+            return dc_score.as_numpy().fill(0)
 
     def bbox_to_coco(self, bbox, w_img, h_img):
         """
