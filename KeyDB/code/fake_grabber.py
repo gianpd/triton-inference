@@ -48,7 +48,7 @@ print(args)
 FPS = 10
 RATE = 1 / FPS
 KEY = 'NJ'
-IMG_BYTES = Path("a83ef8d0-image_2022-10-12_14-37-07.310261.jpg").read_bytes()
+IMG_BYTES = Path("imj.png").read_bytes()
 
 
 grabber_redis = redis.Redis(host=args.host, port=args.port, db=0)
