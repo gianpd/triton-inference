@@ -100,7 +100,6 @@ class TritonPythonModel:
                 inference_dc = self.check_if_defects(inference_dc)
                 
                 np_final = np.concatenate((np_final,inference_dc))
-                msg.good(f'np final : {np_final}')
                 
             np_final = pb_utils.Tensor('dc_scores',np_final[1:])
             inference_response = pb_utils.InferenceResponse(output_tensors=[np_final])
