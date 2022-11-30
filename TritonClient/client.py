@@ -6,6 +6,7 @@ import tritonclient.grpc as grpc
 import cv2
 import redis_utils as rutils
 from wasabi import msg
+import time 
 
 
 from preprocessing import Preproccessing_and_predict_dc
@@ -54,53 +55,56 @@ preproccessing_and_predict_dc = Preproccessing_and_predict_dc(RESIZE_OUTPUT_IMAG
 
 
 def main():
-    ### 0. Start the communication channel with the redis server, for receiving the requests to be passed to the models
-    #client = httpclient.InferenceServerClient(url="localhost:8000")
-    # 1. Start the communication channel with the redis server, for receiving the requests to be passed to the models
-    rs_client = rutils.NJRedisClient(host='172.17.0.2', port=6379, db=0, key='NJ')
-    
-    i = 0
-    while True:
-        i += 1
-       ### 1. Get the payload from KeyDB server
-        payload = rs_client.get_msg
-        if payload is None:
-            msg.info('Received an empty payload')
-        msg.info(f'Received payload with keys: {payload.keys()}')
-        #raw_img = rs_client.get_np_img(payload['data'], payload['size']['height'], payload['size']['width']) # np turns (Y,X,C)
-        raw_img = rs_client.get_np_img(payload['data'])
-        msg.info(raw_img.shape, raw_img.dtype)
+    tsum = 0
         
+    num = 100
+    for e in range (1,num) :
+        t0 = time.time()
+        ### 0. Start the communication channel with the redis server, for receiving the requests to be passed to the models
+        #client = httpclient.InferenceServerClient(url="localhost:8000")
+        # 1. Start the communication channel with the redis server, for receiving the requests to be passed to the models
+        rs_client = rutils.NJRedisClient(host='172.17.0.2', port=6379, db=0, key='NJ')
         
-        img = cv2.resize(raw_img, (min(raw_img.shape[:2]),min(raw_img.shape[:2]))).astype(np.uint8)
-        img = np.asarray(img, dtype=np.uint8)
-        img = np.expand_dims(img, axis=0)
-        
-        ### 2. Make request to TritonServer
-        pipe_input =TRITONCLIENT.get_input(img)
-        pipe_outputs = TRITONCLIENT.get_od_outputs
-        query_response = TRITONCLIENT.make_request(pipe_input, pipe_outputs,model_name='od')
-        
-        ### 3. Show results
-        scores = query_response.as_numpy("detection_scores")
-        boxes = query_response.as_numpy("detection_boxes")
-        msg.good(f'Scores dict:\n {scores}')
-        msg.good(f'Boxes dict:\n {boxes}')
-        
-        #raw_img = cv2.resize(raw_img, (1500, 1500))
-        #raw_img = np.expand_dims(raw_img, axis=0)
-        
-        bbox_test = boxes[0][1]
-        
-        msg.good(f'bbox test: {bbox_test}')
-        
-        dc_response = preproccessing_and_predict_dc.preprocessing(raw_img,scores,boxes)
-        
-        msg.good(f'DC RESPONSE : {dc_response}')
-        
+        i = 0
+        while True:
+            i += 1
+        ### 1. Get the payload from KeyDB server
+            payload = rs_client.get_msg
+            if payload is None:
+                msg.info('Received an empty payload')
+            #raw_img = rs_client.get_np_img(payload['data'], payload['size']['height'], payload['size']['width']) # np turns (Y,X,C)
+            raw_img = rs_client.get_np_img(payload['data'])
+            
+            
+            img = cv2.resize(raw_img, (min(raw_img.shape[:2]),min(raw_img.shape[:2]))).astype(np.uint8)
+            img = np.asarray(img, dtype=np.uint8)
+            img = np.expand_dims(img, axis=0)
+            
+            ### 2. Make request to TritonServer
+            pipe_input =TRITONCLIENT.get_input(img)
+            pipe_outputs = TRITONCLIENT.get_od_outputs
+            query_response = TRITONCLIENT.make_request(pipe_input, pipe_outputs,model_name='od')
+            
+            ### 3. Show results
+            scores = query_response.as_numpy("detection_scores")
+            boxes = query_response.as_numpy("detection_boxes")
+            
+            #raw_img = cv2.resize(raw_img, (1500, 1500))
+            #raw_img = np.expand_dims(raw_img, axis=0)
+
+            
+            dc_response = preproccessing_and_predict_dc.preprocessing(raw_img,scores,boxes)
+            t1 = time.time()
+            tsum = tsum + (t1-t0)
+            
+            msg.good(f'DC RESPONSE : {list(dc_response)}')
+            
+            break
+    msg.good(f'MEAN TIME : {(tsum/num)}')
+            
         
        
-        break
+
     
 
 if __name__ == "__main__":
