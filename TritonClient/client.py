@@ -80,11 +80,9 @@ def main():
                 msg.info('Received an empty payload')
             #raw_img = rs_client.get_np_img(payload['data'], payload['size']['height'], payload['size']['width']) # np turns (Y,X,C)
             raw_img = rs_client.get_np_img(payload['data'])
-        except Exception as e : logger.error(e)
         
-        logger.info("RECEIVED PAYLOAD FROM REDIS")
+            logger.info("RECEIVED PAYLOAD FROM REDIS")
         
-        try :
             img_resize = cv2.resize(raw_img, (min(raw_img.shape[:2]),min(raw_img.shape[:2])))
             img = np.expand_dims(img_resize.astype(np.uint8)
                                 , axis=0)
@@ -93,11 +91,9 @@ def main():
             pipe_input =TRITONCLIENT.get_input(img)
             pipe_outputs = TRITONCLIENT.get_od_outputs
             query_response = TRITONCLIENT.make_request(pipe_input, pipe_outputs,model_name='od')
-        except Exception as e : logger.error(e)
         
-        logger.info("OD REQUEST EXCECUTED")
+            logger.info("OD REQUEST EXCECUTED")
         
-        try :
             ### 3. Show results
             scores = query_response.as_numpy("detection_scores")
             boxes = query_response.as_numpy("detection_boxes")
@@ -108,14 +104,14 @@ def main():
             ### 4. Make DC request
             
             # Preproccessing with python
-            #dc_response = preproccessing_and_predict_dc.preprocessing(raw_img,scores,boxes)
+            #dc_response = preproccessing_and_predict_dc.preprocessing_python(raw_img,scores,boxes)
             
             # Preproccessing with model
             dc_response = preproccessing_and_predict_dc.preprocessing_model(img_resize,scores,boxes)
             
             logger.info("DC REQUEST EXCECUTED")
         
-            logger.info(f'RESULT : {dc_response}')
+            logger.info(f'RESULT : {dc_response} \n\n')
             
         except Exception as e : logger.error(e)
         
