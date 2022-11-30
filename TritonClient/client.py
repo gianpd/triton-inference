@@ -10,9 +10,9 @@ import time
 
 
 from preprocessing import Preproccessing_and_predict_dc
+import logging_utils
 
-
-
+logger= logging_utils.get_logger('client')
 
 class TritonClient:
     
@@ -43,8 +43,13 @@ class TritonClient:
     
     def make_request(self, inputs: list, outputs: list, model_name='od'):
         return self._client.infer(model_name=model_name, inputs=inputs, outputs=outputs)
-        
-TRITONCLIENT = TritonClient()
+     
+try :
+   TRITONCLIENT = TritonClient()
+except Exception as e : logger.error(e)
+
+logger.info('LOADED TRITON CLIENT')
+
 RESIZE_OUTPUT_IMAGES_SHAPE = (260,260)
 THRESHOLD_OD = 0.8
 THRESHOLD_DC = 0.6
@@ -55,36 +60,44 @@ preproccessing_and_predict_dc = Preproccessing_and_predict_dc(RESIZE_OUTPUT_IMAG
 
 
 def main():
-    tsum = 0
-        
-    num = 100
-    for e in range (1,num) :
-        t0 = time.time()
-        ### 0. Start the communication channel with the redis server, for receiving the requests to be passed to the models
-        #client = httpclient.InferenceServerClient(url="localhost:8000")
-        # 1. Start the communication channel with the redis server, for receiving the requests to be passed to the models
-        rs_client = rutils.NJRedisClient(host='172.17.0.2', port=6379, db=0, key='NJ')
-        
-        i = 0
-        while True:
-            i += 1
-        ### 1. Get the payload from KeyDB server
+    ### 0. Start the communication channel with the redis server, for receiving the requests to be passed to the models
+    #client = httpclient.InferenceServerClient(url="localhost:8000")
+    # 1. Start the communication channel with the redis server, for receiving the requests to be passed to the models
+    
+    try :
+       rs_client = rutils.NJRedisClient(host='172.17.0.2', port=6379, db=0, key='NJ')
+    except Exception as e : logger.error(e)
+    
+    logger.info("CONNECTED TO REDIS")
+    
+    i = 0
+    while True:
+        i += 1
+        try :
+            ### 1. Get the payload from KeyDB server
             payload = rs_client.get_msg
             if payload is None:
                 msg.info('Received an empty payload')
             #raw_img = rs_client.get_np_img(payload['data'], payload['size']['height'], payload['size']['width']) # np turns (Y,X,C)
             raw_img = rs_client.get_np_img(payload['data'])
-            
-            
-            img = cv2.resize(raw_img, (min(raw_img.shape[:2]),min(raw_img.shape[:2]))).astype(np.uint8)
-            img = np.asarray(img, dtype=np.uint8)
-            img = np.expand_dims(img, axis=0)
+        except Exception as e : logger.error(e)
+        
+        logger.info("RECEIVED PAYLOAD FROM REDIS")
+        
+        try :
+            img_resize = cv2.resize(raw_img, (min(raw_img.shape[:2]),min(raw_img.shape[:2])))
+            img = np.expand_dims(img_resize.astype(np.uint8)
+                                , axis=0)
             
             ### 2. Make request to TritonServer
             pipe_input =TRITONCLIENT.get_input(img)
             pipe_outputs = TRITONCLIENT.get_od_outputs
             query_response = TRITONCLIENT.make_request(pipe_input, pipe_outputs,model_name='od')
-            
+        except Exception as e : logger.error(e)
+        
+        logger.info("OD REQUEST EXCECUTED")
+        
+        try :
             ### 3. Show results
             scores = query_response.as_numpy("detection_scores")
             boxes = query_response.as_numpy("detection_boxes")
@@ -92,16 +105,24 @@ def main():
             #raw_img = cv2.resize(raw_img, (1500, 1500))
             #raw_img = np.expand_dims(raw_img, axis=0)
 
+            ### 4. Make DC request
             
-            dc_response = preproccessing_and_predict_dc.preprocessing(raw_img,scores,boxes)
-            t1 = time.time()
-            tsum = tsum + (t1-t0)
+            # Preproccessing with python
+            #dc_response = preproccessing_and_predict_dc.preprocessing(raw_img,scores,boxes)
             
-            msg.good(f'DC RESPONSE : {list(dc_response)}')
+            # Preproccessing with model
+            dc_response = preproccessing_and_predict_dc.preprocessing_model(img_resize,scores,boxes)
             
-            break
-    msg.good(f'MEAN TIME : {(tsum/num)}')
+            logger.info("DC REQUEST EXCECUTED")
+        
+            logger.info(f'RESULT : {dc_response}')
             
+        except Exception as e : logger.error(e)
+        
+        
+        
+        break
+
         
        
 

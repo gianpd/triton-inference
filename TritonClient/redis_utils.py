@@ -7,10 +7,6 @@ import numpy as np
 
 from typing import List, Dict, Union, Optional
 
-FPS = 5
-RATE = 1 / FPS
-KEY = 'NJ'
-
 class NJRedisClient:
     def __init__(self, host: str, port: int, key: str, db: Optional[int] = 0, fps: Optional[int] = 8):
         self._host = host
