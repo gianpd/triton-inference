@@ -8,7 +8,6 @@ else
 KEY_CONTAINER_NAME=$1
 fi
 echo Building fake grabber
-docker pull fake-grabber --name fake-grabber
 docker build --rm --no-cache -t fake-grabber .
 echo Running fake grabber with args: "$@"
 HOST=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' $KEY_CONTAINER_NAME) # get the keydb host

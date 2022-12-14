@@ -1,7 +1,11 @@
 *.pb
+.ipynb_checkpoints/
+*.Identifier
 variables/
 __pycache__/
 1/
 *.jpg
 *.jpeg
 *.png
+*.zip
+*.log

@@ -1,0 +1,68 @@
+version: "3.9"
+
+services:
+  
+  tmp:
+    image: busybox
+    command: chmod -R 777 /tmp/docker
+    volumes:
+      - /tmp/docker/
+
+  triton-client:
+    container_name: "nj-triton-client-container"
+    network_mode: host
+    build:
+     context: ./TritonClient
+     dockerfile: Dockerfile
+    volumes:
+     - "./TritonClient/:/workspace/"
+    volumes_from:
+     - tmp
+    depends_on:
+     - grabber
+     - key-db-server
+     # - triton-server
+
+  grabber:
+    container_name: "fake-grabber-container"
+    # command: "test"
+    build:
+      context: ./KeyDB
+    volumes_from:
+     - tmp
+    depends_on:
+     - key-db-server
+
+  key-db-server:
+    container_name: "NJKeyDB-server"
+    image: "eqalpha/keydb"
+    command: "keydb-server /etc/keydb.conf"
+    ports: 
+    - "6379:6379"
+    volumes:
+     - "./keydb-conf/keydb.conf:/etc/keydb.conf"
+    volumes_from:
+     - tmp
+
+#   triton-server:
+#     container_name: "triton-server-container"
+#     # image: "nvcr.io/nvidia/tritonserver:22.10-py3"
+#     ipc: host
+#     command: "tritonserver --model-repository=/workspace/model_repository/ --log-verbose=1 --exit-on-error=false"
+#     build:
+#      context: ./TritonServer
+#      dockerfile: Dockerfile
+#      # shm_size: 256m
+#     ports:
+#      - "8001:8001"
+#      - "8002:8002"
+#      - "8003:8000"
+#     volumes:
+#     - "./TritonServer:/workspace/"
+#     deploy:
+#       resources:
+#         reservations:
+#           devices:
+#             - driver: nvidia
+#               capabilities: [gpu]
+
