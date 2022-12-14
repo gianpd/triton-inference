@@ -1,6 +1,6 @@
 *.pb
-.ipynb_checkpoints/
 *.Identifier
+.ipynb_checkpoints/
 variables/
 __pycache__/
 1/

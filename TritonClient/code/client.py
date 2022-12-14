@@ -5,16 +5,6 @@ from tritonclient.utils import *
 import tritonclient.grpc as grpc
 import cv2
 import logging_utils
-
-from typing import List, Dict, Union, Optional
-
-logger = logging_utils.get_logger('TritonClient')
-
-import utils
-from config import *
-
-import requests
-
 import msgpack
 import sys
 import base64
@@ -22,6 +12,17 @@ import json
 from uuid import uuid4
 from pympler import asizeof
 from simplejpeg import encode_jpeg
+import requests
+
+
+from typing import List, Dict, Union, Optional
+
+logger = logging_utils.get_logger('TritonClient')
+
+#PRIIVATE LIB
+import utils
+from config import *
+
 
 def make_anonymizer_request(
     payload: bytes, 
@@ -35,7 +36,7 @@ def make_anonymizer_request(
         print(e)
         return None
 
-def create_anonymizer_payload(img : np.array) :
+def create_anonymizer_payload(img : np.array) -> bytes :
     payload = {
         "meta": {
         "size": {
@@ -52,6 +53,7 @@ def create_anonymizer_payload(img : np.array) :
 class TritonClient:
     
     def __init__(self, url='localhost:4001'):
+        #SET URL SERVER
         self._client = grpc.InferenceServerClient(url=url)
                 
             
@@ -68,6 +70,7 @@ class TritonClient:
         return [grpc.InferRequestedOutput("cropped_images")]
     
     def make_od_request(self, od_img):
+        # Prepare model input
         od_input = self.get_od_input(od_img)
         od_outputs = self.get_od_outputs
         ### 3. Make request to OD model
@@ -77,6 +80,7 @@ class TritonClient:
         boxes = query_response.as_numpy("detection_boxes")[0][:5]
         return scores, boxes
     
+    #Prepare od input
     def get_od_input(self, img: np.ndarray):
         infer_input = grpc.InferInput("input", img.shape, np_to_triton_dtype(img.dtype))
         # infer_input = httpclient.InferInput("input", img.shape, np_to_triton_dtype(img.dtype))
@@ -92,22 +96,27 @@ TRITONCLIENT = TritonClient()
 def main():
     # start = time.time()
     ### 0. Start the communication channel with the redis server, for receiving the requests to be passed to the models
-    logger.info('##### START REQUESTS')
+    logger.info('##### START REQUESTS #####')
+    # Connect to Redis
     rs_client = utils.NJRedisClient(unix_socket_path="/tmp/docker/keydb.sock")
+    # Connect to MQTT Server e Topic
     pub = utils.NjMQTTPub(clientID='rock_nj_pub', topic='test_event_alert')
     pub.start()
     # i = 0
     while True:
          ### 1. Get the payload from KeyDB server
+        # Get Redis Client
         current_cnt = rs_client.get_cnt
         if current_cnt == None:     
             logger.warning('Waiting Grabber')
             time.sleep(1)
             continue
+        # GRABBER
         if int(current_cnt) % DOWNSAMPLING != 0: # il grabber lavora a 15 FPS noi a 5 FPS quindi facciamo un downsampling di 3 e aspettiamo 0.2 s
             time.sleep(0.2)
             continue
         
+        # Get Payload from Redis
         grabber_payload = rs_client.get_msg
         if grabber_payload is None:
             logger.warning('Received an empty grabber_payload')
@@ -115,7 +124,7 @@ def main():
             continue
 
 
-            
+        # Read Payload from Redis
         raw_img = rs_client.get_np_img(grabber_payload['data'], grabber_payload['size']['height'], grabber_payload['size']['width']) # np turns (Y,X,C)
         logger.info(f'Received RAW IMG with shape {raw_img.shape}')
         # first resize for preparing OD input
@@ -162,30 +171,37 @@ def main():
             ### 8. Make request to the DC model
             logger.info('### Dywidag detected!')
             logger.info('Preparing DC request ...')
+            # Preparing data for DC prediction
             dc_inputs = [grpc.InferInput('input_1', cropped_img.shape, np_to_triton_dtype(cropped_img.dtype))]
             dc_inputs[0].set_data_from_numpy(cropped_img)
             dc_outputs = [grpc.InferRequestedOutput("Identity")]
+            # DC model Request
             query_response = TRITONCLIENT.make_request(
                 dc_inputs, 
                 dc_outputs, model_name='dc').as_numpy('Identity')
             logger.debug(f"RAW DC OUTPUT PREDICTION: {query_response}")
             
+            # Casting DC model results with threshold
             query_response_casted = (query_response >= TH_SCORE_DC).astype(int)
             logger.debug(f'query_response_casted: {query_response_casted}')
-            if False: #query_response_casted[0][0] or not query_response_casted[0].any():
+            if query_response_casted[0][0] or not query_response_casted[0].any():
                 logger.info('No defects detected. Skipped.')
             else:
+                # Get class of damage
                 label_names = PREDS_MAP_DICT.get(str(query_response_casted)) # list with the EVT_CODE
                 logger.info(f'Anomaly detected: {label_names}')
                 
                 ### Call the anonymizer
+                # Prepare data for anonymizer
                 cropped_image_casted_uint8= cropped_img[0].astype(np.uint8)
                 logger.info(f'Original cropped image dimension: {sys.getsizeof(cropped_img[0])}')
                 logger.info(f'Casted to uint8 cropped image dimension: {sys.getsizeof(cropped_image_casted_uint8)}')
                 
                 anonymizer_payload = create_anonymizer_payload(cropped_image_casted_uint8)
+                # Make anonymizer request
                 response = make_anonymizer_request(anonymizer_payload) # i'm expecting a msgpack
-
+                
+                # Read Anonymizer output
                 response = msgpack.loads(response.content) #response = msgpack.unpackb(response.content, raw=False)
                 cropped_img = response['image'] # the anonymized cropped img to be sent
                 logger.info(f'Anonymizer output shape: {cropped_img.shape}')

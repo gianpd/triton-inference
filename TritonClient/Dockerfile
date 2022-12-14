@@ -9,4 +9,4 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
 
 COPY ./code /workspace/
 
-ENTRYPOINT ["python", "code/client.py"]
+ENTRYPOINT ["python", "client.py"]
