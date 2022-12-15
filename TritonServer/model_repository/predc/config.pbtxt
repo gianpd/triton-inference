@@ -1,0 +1,59 @@
+### ROCK NJ: Dc preprocessing protobuf config file
+
+
+name: "predc"
+platform: "tensorflow_savedmodel"
+default_model_filename: "model.savedmodel"
+max_batch_size: 0
+
+input: [
+  {
+    name: "bboxes"
+    data_type: TYPE_FP32,
+    dims: [4]
+  },
+  {
+    name: "img"
+    data_type: TYPE_UINT8
+    dims: [1, 1500, 1500, 3]
+  }
+]
+output: [
+  {
+    name: 'cropped_images'
+    data_type: TYPE_FP32,
+    dims: [-1, -1, -1]
+  }
+]
+
+
+# Switch to CPU instance since memory might not be enough for
+# certain Models.
+
+# Specify CPU instance.
+instance_group {
+ name: "predc_0"
+ count: 1
+  kind: KIND_CPU
+}
+
+# # Specify GPU instance.
+# instance_group {
+#    name: "od_0"
+#    count: 1
+#    gpus: 0
+#    kind: KIND_GPU
+#  }
+
+# # Enable TensorRT acceleration running in gpu instance. It might take several
+# # minutes during intialization to generate tensorrt online caches.
+# # Limit max_workspace_size_bytes to ~256MB
+# optimization { execution_accelerators {
+#   gpu_execution_accelerator {
+#     name : "tensorrt"
+#     parameters { key: "precision_mode" value: "FP16" }
+#     # parameters { key: "max_workspace_size_bytes" value: "268435456"}
+#     # parameters { key: "minimum_segment_size" value: "10"}
+# }
+# }}
+

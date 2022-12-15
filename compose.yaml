@@ -8,24 +8,24 @@ services:
     volumes:
       - /tmp/docker/
 
-  triton-client:
-    container_name: "nj-triton-client-container"
-    network_mode: host
-    build:
-     context: ./TritonClient
-     dockerfile: Dockerfile
-    volumes:
-     - "./TritonClient/:/workspace/"
-    volumes_from:
-     - tmp
-    depends_on:
-     - grabber
-     - key-db-server
-     # - triton-server
+#   triton-client:
+#     container_name: "nj-triton-client-container"
+#     network_mode: host
+#     build:
+#      context: ./TritonClient
+#      dockerfile: Dockerfile
+#     volumes:
+#      - "./TritonClient/:/workspace/"
+#     volumes_from:
+#      - tmp
+#     depends_on:
+#      - grabber
+#      - key-db-server
+#      # - triton-server
 
   grabber:
     container_name: "fake-grabber-container"
-    command: "test"
+    # command: "test"
     build:
       context: ./KeyDB
     volumes_from:
@@ -52,7 +52,7 @@ services:
 #     build:
 #      context: ./TritonServer
 #      dockerfile: Dockerfile
-#      shm_size: 256m
+#      # shm_size: 256m
 #     ports:
 #      - "8001:8001"
 #      - "8002:8002"
