@@ -7,9 +7,9 @@ TH_SCORE_OD =  os.getenv("TH_SCORE_OD", 0.8)
 MODEL =  os.getenv('MODEL', 'rock_nj_model')
 MODEL_VERSION =  os.getenv('MODEL_VERSION', 'v0.1')
 DOWNSAMPLING =  os.getenv('DOWNSAMPLING', 3)
-APPLIANCE_UID = os.getenv('APPLIANCE_UID', '')
-HARDWARE_VERSION = os.getenv('HARDWARE_VERSION', '')
-SOFTWARE_VERSION = os.getenv('SOFTWARE_VERSION', '')
+APPLIANCE_UID = os.getenv('APPLIANCE_UID', 'b49691e20fb8')
+HARDWARE_VERSION = os.getenv('HARDWARE_VERSION', 'ROCK_ETH_001')
+SOFTWARE_VERSION = os.getenv('SOFTWARE_VERSION', 'AIJ_od_predc_dc_0.1')
 
 
 PREDS_MAP_DICT = {

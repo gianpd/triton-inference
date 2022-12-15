@@ -12,8 +12,6 @@ import json
 from uuid import uuid4
 from simplejpeg import encode_jpeg
 
-from typing import List, Dict, Union, Optional
-
 import logging_utils
 logger = logging_utils.get_logger('TritonClient')
 
@@ -69,7 +67,6 @@ def main():
     rs_client = utils.NJRedisClient(unix_socket_path="/tmp/docker/keydb.sock")
     pub = utils.NjMQTTPub(clientID='rock_nj_pub', topic='test_event_alert')
     pub.start()
-    # i = 0
     last_cnt = -1
     while True:
          ### 1. Get the payload from KeyDB server
@@ -84,19 +81,20 @@ def main():
             continue
         
         if last_cnt >= current_cnt:
-            logger.info('Last CNT is greather than the current CNT. Waiting.')
+            logger.info('Last CNT is >= than the current CNT. Waiting.')
             time.sleep(0.5)
             continue
         
         last_cnt = current_cnt
+        logger.info(f'Current CNT {last_cnt} ...')
         grabber_payload = rs_client.get_msg
         if grabber_payload is None:
             logger.warning('Received an empty grabber_payload')
             # raise ValueError('Received an empty grabber_payload')
+            time.sleep(1)
             continue
 
 
-            
         raw_img = rs_client.get_np_img(grabber_payload['data'], grabber_payload['size']['height'], grabber_payload['size']['width']) # np turns (Y,X,C)
         logger.info(f'Received RAW IMG with shape {raw_img.shape}')
         # first resize for preparing OD input
@@ -153,18 +151,16 @@ def main():
             
             query_response_casted = (query_response >= TH_SCORE_DC).astype(int)
             logger.debug(f'query_response_casted: {query_response_casted}')
-            if False: #query_response_casted[0][0] or not query_response_casted[0].any():
+            if query_response_casted[0][0] or not query_response_casted[0].any():
                 logger.info('No defects detected. Skipped.')
             else:
                 label_names = PREDS_MAP_DICT.get(str(query_response_casted)) # list with the EVT_CODE
-                logger.info(f'Anomaly detected: {label_names}')
+                logger.info(f'### Anomaly detected: {label_names}')
                 
                 ### Call the anonymizer
-                cropped_image_casted_uint8= cropped_img[0].astype(np.uint8)
-                logger.info(f'Original cropped image dimension: {sys.getsizeof(cropped_img[0])}')
-                logger.info(f'Casted to uint8 cropped image dimension: {sys.getsizeof(cropped_image_casted_uint8)}')
-                
-                anonymizer_payload = utils.create_anonymizer_payload(cropped_image_casted_uint8)
+                cropped_img = cropped_img[0].astype(np.uint8)
+                logger.info(f'Calling the anonymizer with an image of shape {cropped_img.shape}...')
+                anonymizer_payload = utils.create_anonymizer_payload(cropped_img)
                 response = utils.make_anonymizer_request(anonymizer_payload) # i'm expecting a msgpack
 
                 response = msgpack.loads(response.content) #response = msgpack.unpackb(response.content, raw=False)
@@ -172,11 +168,13 @@ def main():
                 logger.info(f'Anonymizer output shape: {cropped_img.shape}')
                 
                 ### Prepare the alert msg and publish it to the MQTT broker
+                logger.info('Preparing the alert message ...')
                 position = grabber_payload['position']
                 _, _ = position.pop('valid'), position.pop('mileage')
                 position['speed'] = position['speed'] * 10e3 / 3600 # from KM/H to m/s
                 events = [{
                     "timestamp": grabber_payload['timestamp'] / 10e9, # from nanoseconds to seconds 
+                    "linked_data": [],
                     "uid": uuid4().hex[:12], 
                     "model": MODEL, 
                     "model_version": MODEL_VERSION,
@@ -184,10 +182,17 @@ def main():
                     "position": position
                 } for x in label_names]
                 
-                JPEG = encode_jpeg(cropped_image_casted_uint8) # returns bytes
-                logger.debug(f'The len of the jpeg-encoded bytes is {len(JPEG)}')
+                JPEG = encode_jpeg(cropped_img) # returns bytes and be sure to encode the anonimized image
+                # logger.debug(f'The len of the jpeg-encoded bytes is {len(JPEG)}')
                 alert_json = {
-                    'rock_event': utils.make_event_json(grabber_payload['camera_id'], events),
+                    'rock_event': utils.make_event_json(
+                        appliance_uid=APPLIANCE_UID,
+                        hardware_version=HARDWARE_VERSION,
+                        software_version=SOFTWARE_VERSION,
+                        camera_id=grabber_payload['camera_id'], 
+                        events=events,
+                        obj_code=OBJ_CODE,
+                        app_code=AP_CODE),
                      'body': base64.b64encode(JPEG).decode('utf-8')
                 }
                 

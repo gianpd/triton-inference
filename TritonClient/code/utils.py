@@ -18,7 +18,15 @@ FPS = 5
 RATE = 1 / FPS
 KEY = 'LEFT'
 
-def make_event_json(appliance_uid: str, hardware_version: str, software_version: str, camera_id: str, events: List[Dict[str, str]]) -> Dict:  
+def make_event_json(
+    appliance_uid: str, 
+    hardware_version: str, 
+    software_version: str, 
+    camera_id: str, 
+    events: List[Dict[str, str]],
+    obj_code: str = 'OBJ_NJ',
+    app_code: str = 'AIJ') -> Dict:
+    
     js_init = {
         "appliance": {
             "uid": appliance_uid,
@@ -30,19 +38,19 @@ def make_event_json(appliance_uid: str, hardware_version: str, software_version:
             "uid": camera_id,
             "pointing": "LEFT"
             },
-        "object_code": "OBJ_NJ",
-        "application_code": "AIJ",
+        "object_code": obj_code,
+        "application_code": app_code,
         "events": events,
     }
     crc_json = get_crc_json(js_init)
     js_init['crc']  = crc_json
-    return js_init
+    return json.dumps(js_init, sort_keys=True)
 
-def get_crc_json(json_dict : dict) -> str:
+def get_crc_json(json_dict) :
     js_dumps = json.dumps(json_dict, sort_keys=True)
+    js_dumps.replace(" ", "")
     js_bytes = js_dumps.encode('utf-8')
-    crc_js = hex(zlib.crc32(js_bytes))
-    return crc_js
+    return zlib.crc32(js_bytes)
 
 def make_anonymizer_request(
     payload: bytes, 

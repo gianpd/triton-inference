@@ -2,11 +2,11 @@ version: "3.9"
 
 services:
   
-  tmp:
-    image: busybox
-    command: chmod -R 777 /tmp/docker
-    volumes:
-      - /tmp/docker/
+  # tmp:
+  #   image: busybox
+  #   command: chmod -R 777 /tmp/docker
+  #   volumes:
+  #     - /tmp/docker/
 
 #   triton-client:
 #     container_name: "nj-triton-client-container"
@@ -28,8 +28,8 @@ services:
     # command: "test"
     build:
       context: ./KeyDB
-    volumes_from:
-     - tmp
+    volumes:
+     - "./tmp/KeyDB/:/tmp/docker"
     depends_on:
      - key-db-server
 
@@ -41,8 +41,9 @@ services:
     - "6379:6379"
     volumes:
      - "./keydb-conf/keydb.conf:/etc/keydb.conf"
-    volumes_from:
-     - tmp
+     - "./tmp/KeyDB/:/tmp/docker"
+    # volumes_from:
+    #  - tmp
 
 #   triton-server:
 #     container_name: "triton-server-container"

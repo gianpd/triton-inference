@@ -12,7 +12,7 @@ print(args)
 
 FPS = 10
 RATE = 1 / FPS
-KEY = 'NJ'
+KEY = 'LEFT'
 #IMG_BYTES = Path("image_2022-10-12_13-38-31.496364.jpg").read_bytes()
 
 
