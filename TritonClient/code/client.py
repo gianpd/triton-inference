@@ -125,6 +125,8 @@ def main():
         predc_outputs = TRITONCLIENT.get_predc_outputs
         
         ### 5. For over all the detected NJs: not all are centered
+        position = get_parsed_position(grabber_payload) # get the position of the event (equal for each objects in the frame)
+        logger.info(f'Get position from grabber: {position}')
         for idx, bbox in enumerate(bbox_ls):
             predc_inputs[1].set_data_from_numpy(bbox)
             logger.info(f'{idx}-th Making PREDC request with NJ bbox: {bbox}')
@@ -172,20 +174,7 @@ def main():
                 
                 ### Prepare the alert msg and publish it to the MQTT broker
                 logger.info('Preparing the alert message ...')
-                position = grabber_payload['position']
 
-                try:
-                    _ = position.pop('valid')
-                except KeyError as e:
-                    logger.warning(e)
-                    pass
-                try:
-                    _ = position.pop('mileage')
-                except KeyError as e:
-                    logger.warning(e)
-                    pass
-
-                position['speed'] = position['speed'] * 10e3 / 3600 # from KM/H to m/s
                 events = [{
                     "timestamp": grabber_payload['timestamp'] // 10e9, # from nanoseconds to seconds (int)
                     "linked_data": [],
@@ -214,6 +203,11 @@ def main():
                 #logger.debug(asizeof.asizeof(alert_json))
                 pub.publish(json.dumps(alert_json))
                 
-                
+
+def get_parsed_position(grabber_payload):
+    position = grabber_payload['position']
+    position['speed'] = position['speed'] * 10e3 / 3600 # from KM/H to m/s
+    return position
+
 if __name__ == "__main__":
     main()
