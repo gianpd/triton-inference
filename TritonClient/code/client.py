@@ -6,7 +6,6 @@ import tritonclient.grpc as grpc
 import cv2
 
 import msgpack
-import sys
 import base64
 import json
 from uuid import uuid4
@@ -75,8 +74,9 @@ def main():
             logger.warning('Waiting Grabber')
             time.sleep(1)
             continue
-
-        if int(current_cnt) % DOWNSAMPLING != 0: # il grabber lavora a 15 FPS noi a 5 FPS quindi facciamo un downsampling di 3 e aspettiamo 0.2 s
+        
+        current_cnt = int(current_cnt)
+        if current_cnt % DOWNSAMPLING != 0: # il grabber lavora a 15 FPS noi a 5 FPS quindi facciamo un downsampling di 3 e aspettiamo 0.2 s
             time.sleep(0.2)
             continue
         
@@ -164,16 +164,30 @@ def main():
                 response = utils.make_anonymizer_request(anonymizer_payload) # i'm expecting a msgpack
 
                 response = msgpack.loads(response.content) #response = msgpack.unpackb(response.content, raw=False)
-                cropped_img = response['image'] # the anonymized cropped img to be sent
+                cropped_img = rs_client.get_np_img(
+                    response['image'], 
+                    response['status']['shape']['height'], 
+                    response['status']['shape']['width'])
                 logger.info(f'Anonymizer output shape: {cropped_img.shape}')
                 
                 ### Prepare the alert msg and publish it to the MQTT broker
                 logger.info('Preparing the alert message ...')
                 position = grabber_payload['position']
-                _, _ = position.pop('valid'), position.pop('mileage')
+
+                try:
+                    _ = position.pop('valid')
+                except KeyError as e:
+                    logger.warning(e)
+                    pass
+                try:
+                    _ = position.pop('mileage')
+                except KeyError as e:
+                    logger.warning(e)
+                    pass
+
                 position['speed'] = position['speed'] * 10e3 / 3600 # from KM/H to m/s
                 events = [{
-                    "timestamp": grabber_payload['timestamp'] / 10e9, # from nanoseconds to seconds 
+                    "timestamp": grabber_payload['timestamp'] // 10e9, # from nanoseconds to seconds (int)
                     "linked_data": [],
                     "uid": uuid4().hex[:12], 
                     "model": MODEL, 

@@ -48,20 +48,20 @@ def make_event_json(
 
 def get_crc_json(json_dict) :
     js_dumps = json.dumps(json_dict, sort_keys=True)
-    js_dumps.replace(" ", "")
+    js_dumps = js_dumps.replace(" ", "")
     js_bytes = js_dumps.encode('utf-8')
     return zlib.crc32(js_bytes)
 
 def make_anonymizer_request(
     payload: bytes, 
-    url: str ='http://localhost:5020/anonymize', 
+    url: str ='http://127.0.0.1:5020/anonymize', 
     method: str ='POST', 
     header: dict ={'Content-Type': 'application/octet-stream'}) -> Union[requests.Response, None]:
 
     try:
         return requests.request(method, url=url, data=payload, headers=header)
     except requests.ConnectionError as e:
-        print(e)
+        logger.warning(e)
         return None
 
 def create_anonymizer_payload(img : np.array) :
@@ -80,13 +80,13 @@ def create_anonymizer_payload(img : np.array) :
 
 class NJRedisClient:
     def __init__(self, 
-                 host: Optional[str] = 'localhost', 
+                 host: Optional[str] = '127.0.0.1', 
                  port: Optional[int] = 6379, 
                  key: Optional[str] = KEY,
                  cnt_key: Optional[str] = 'LEFT_cnt',
                  unix_socket_path: Optional[str] = None, 
                  db: Optional[int] = 0, 
-                 fps: Optional[int] = 8):
+                 fps: Optional[int] = 5):
         self._host = host
         self._port = port
         self._key = key
@@ -120,7 +120,7 @@ class NJRedisClient:
 
     
 class NjMQTTPub():
-    def __init__(self, clientID, broker="127.0.0.0", port=1883, topic="", qos=1):
+    def __init__(self, clientID, broker="127.0.0.1", port=1883, topic="", qos=1):
         self.clientID_ = clientID
         self.broker_ = broker
         self.port_ = port
